@@ -1,0 +1,94 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { View, Text, TextInput, Button, FlatList, TouchableOpacity } from 'react-native';
+import { openDatabase } from 'expo-sqlite';
+import axios from 'axios';
+import { useState, useEffect } from 'react';
+
+const Stack = createStackNavigator();
+const db = openDatabase('favorites.db');
+
+const HomeScreen = ({ navigation }) => {
+  const [recipes, setRecipes] = useState([]);
+  const [query, setQuery] = useState('');
+
+  const fetchRecipes = async () => {
+    try {
+      const response = await axios.get(`https://api.spoonacular.com/recipes/complexSearch?query=${query}&apiKey=YOUR_API_KEY`);
+      setRecipes(response.data.results);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <View>
+      <TextInput placeholder="Search Recipes" value={query} onChangeText={setQuery} />
+      <Button title="Search" onPress={fetchRecipes} />
+      <FlatList
+        data={recipes}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}>
+            <Text>{item.title}</Text>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+  );
+};
+
+const RecipeDetailScreen = ({ route }) => {
+  const { recipe } = route.params;
+
+  const saveToFavorites = () => {
+    db.transaction(tx => {
+      tx.executeSql('create table if not exists favorites (id integer primary key not null, title text);');
+      tx.executeSql('insert into favorites (id, title) values (?, ?)', [recipe.id, recipe.title]);
+    });
+  };
+
+  return (
+    <View>
+      <Text>{recipe.title}</Text>
+      <Button title="Save to Favorites" onPress={saveToFavorites} />
+    </View>
+  );
+};
+
+const FavoritesScreen = () => {
+  const [favorites, setFavorites] = useState([]);
+
+  useEffect(() => {
+    db.transaction(tx => {
+      tx.executeSql('select * from favorites', [], (_, { rows }) => {
+        setFavorites(rows._array);
+      });
+    });
+  }, []);
+
+  return (
+    <View>
+      <FlatList
+        data={favorites}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <Text>{item.title}</Text>
+        )}
+      />
+    </View>
+  );
+};
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
+        <Stack.Screen name="Favorites" component={FavoritesScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
