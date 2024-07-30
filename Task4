@@ -1,0 +1,138 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, TextInput, Picker, Dimensions } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import SQLite from 'react-native-sqlite-storage';
+import { BarChart } from 'react-native-chart-kit';
+
+const db = SQLite.openDatabase({ name: 'expenses.db', location: 'default' });
+
+const HomeScreen = ({ navigation }) => {
+  return (
+    <View>
+      <Button
+        title="Add Expense"
+        onPress={() => navigation.navigate('AddExpense')}
+      />
+      <Button
+        title="View Summary"
+        onPress={() => navigation.navigate('Summary')}
+      />
+    </View>
+  );
+};
+
+const AddExpenseScreen = ({ navigation }) => {
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('');
+  const [note, setNote] = useState('');
+
+  const addExpense = () => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL, category TEXT, note TEXT, date TEXT)',
+        []
+      );
+      tx.executeSql(
+        'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?)',
+        [amount, category, note, new Date().toISOString()]
+      );
+    });
+    navigation.goBack();
+  };
+
+  return (
+    <View>
+      <Text>Amount</Text>
+      <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" />
+      <Text>Category</Text>
+      <Picker selectedValue={category} onValueChange={itemValue => setCategory(itemValue)}>
+        <Picker.Item label="Food" value="Food" />
+        <Picker.Item label="Transport" value="Transport" />
+        <Picker.Item label="Entertainment" value="Entertainment" />
+        <Picker.Item label="Other" value="Other" />
+      </Picker>
+      <Text>Note</Text>
+      <TextInput value={note} onChangeText={setNote} />
+      <Button title="Add Expense" onPress={addExpense} />
+    </View>
+  );
+};
+
+const ExpenseSummaryScreen = () => {
+  const [expenses, setExpenses] = useState([]);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    db.transaction(tx => {
+      tx.executeSql('SELECT * FROM expenses', [], (tx, results) => {
+        let len = results.rows.length;
+        let data = [];
+        let total = 0;
+        for (let i = 0; i < len; i++) {
+          let row = results.rows.item(i);
+          data.push(row);
+          total += row.amount;
+        }
+        setExpenses(data);
+        setTotal(total);
+      });
+    });
+  }, []);
+
+  const screenWidth = Dimensions.get('window').width;
+  const chartConfig = {
+    backgroundColor: '#e26a00',
+    backgroundGradientFrom: '#fb8c00',
+    backgroundGradientTo: '#ffa726',
+    decimalPlaces: 2,
+    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForDots: {
+      r: '6',
+      strokeWidth: '2',
+      stroke: '#ffa726',
+    },
+  };
+
+  const data = {
+    labels: expenses.map(exp => exp.category),
+    datasets: [
+      {
+        data: expenses.map(exp => exp.amount),
+      },
+    ],
+  };
+
+  return (
+    <View>
+      <Text>Total Spent: ${total}</Text>
+      <BarChart
+        data={data}
+        width={screenWidth}
+        height={220}
+        chartConfig={chartConfig}
+        verticalLabelRotation={30}
+      />
+    </View>
+  );
+};
+
+const Stack = createStackNavigator();
+
+const App = () => {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
+        <Stack.Screen name="Summary" component={ExpenseSummaryScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+export default App;
