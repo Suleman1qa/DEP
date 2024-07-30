@@ -1,0 +1,120 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, Button, ScrollView } from 'react-native';
+import axios from 'axios';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+const API_KEY = 'YOUR_OPENWEATHERMAP_API_KEY';
+
+const CurrentWeatherScreen = () => {
+  const [city, setCity] = useState('London');
+  const [weather, setWeather] = useState(null);
+
+  const fetchWeather = async (city) => {
+    try {
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+      );
+      setWeather(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeather(city);
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter city"
+        value={city}
+        onChangeText={(text) => setCity(text)}
+      />
+      <Button title="Get Weather" onPress={() => fetchWeather(city)} />
+      {weather && (
+        <View>
+          <Text>Temperature: {weather.main.temp}°C</Text>
+          <Text>Weather: {weather.weather[0].description}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const ForecastScreen = () => {
+  const [city, setCity] = useState('London');
+  const [forecast, setForecast] = useState(null);
+
+  const fetchForecast = async (city) => {
+    try {
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
+      );
+      setForecast(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchForecast(city);
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter city"
+        value={city}
+        onChangeText={(text) => setCity(text)}
+      />
+      <Button title="Get Forecast" onPress={() => fetchForecast(city)} />
+      <ScrollView>
+        {forecast &&
+          forecast.list.map((item) => (
+            <View key={item.dt} style={styles.forecastItem}>
+              <Text>{item.dt_txt}</Text>
+              <Text>Temp: {item.main.temp}°C</Text>
+              <Text>Weather: {item.weather[0].description}</Text>
+            </View>
+          ))}
+      </ScrollView>
+    </View>
+  );
+};
+
+const Tab = createBottomTabNavigator();
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Tab.Navigator>
+        <Tab.Screen name="Current Weather" component={CurrentWeatherScreen} />
+        <Tab.Screen name="Forecast" component={ForecastScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  input: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    marginBottom: 20,
+    padding: 10,
+    width: '80%',
+  },
+  forecastItem: {
+    marginBottom: 20,
+  },
+});
